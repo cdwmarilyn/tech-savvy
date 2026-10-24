@@ -1,187 +1,26 @@
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#334e9a">
-<link rel="icon" href="./icon.svg">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tech Savvy</title>
-<style>
-body{font-family:Arial,sans-serif;background:#f4f6fb;margin:0;color:#243047}
-header{background:#334e9a;color:white;padding:22px;text-align:center}
-main{max-width:650px;margin:auto;padding:16px}
-input,textarea,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:9px;border:1px solid #ccc;font:inherit}
-textarea{min-height:110px}
-button{background:#334e9a;color:white;border:0;cursor:pointer}
-.card{background:white;padding:15px;margin:12px 0;border-radius:12px;box-shadow:0 2px 8px #0001}
-img{max-width:100%;max-height:250px;border-radius:8px}
-.small{background:#e9edf8;color:#243047}
-.danger{background:#b73545}
-.hidden{display:none}
-pre{white-space:pre-wrap;font-family:inherit}
-</style>
-</head>
-<body>
-<header>
-<h1>💻 Tech Savvy</h1>
-<p>My Troubleshooting Library</p>
-</header>
-<main>
-<input id="search" placeholder="🔍 Search issues or solutions..." oninput="render()">
-<div class="card">
-<h3 id="formTitle">Add Troubleshooting</h3>
-<input id="issue" placeholder="Issue / Problem">
-<textarea id="solution" placeholder="Solution / Steps"></textarea>
-<label>Attach image</label>
-<input id="photo" type="file" accept="image/*">
-<button onclick="save()">Save Record</button>
-<button class="small" onclick="clearForm()">Clear</button>
-</div>
-<div id="records"></div>
-<div class="card">
-<h3>Backup & Restore</h3>
-<button onclick="backup()">Export Backup</button>
-<input type="file" accept=".json,application/json" onchange="restore(event)">
-<p style="font-size:12px">Keep your backup file safe. Records stay in this browser unless exported.</p>
-</div>
-  
-<footer style="
-  text-align:center;
-  padding:25px 10px;
-  color:#667085;
-  font-size:12px;
-">
-  Designed & Created by<br>
-  <strong style="color:#334e9a;font-size:14px;">
-    Marilyn Ursal
-  </strong>
-  <p>© 2026 • All Rights Reserved</p>
-</footer>
-
-</main>
-<script>
-const KEY="tech_savvy_records_v1";
-let records=JSON.parse(localStorage.getItem(KEY)||"[]");
-let editId=null;
-let pendingImage="";
-const el=id=>document.getElementById(id);
-el("photo").onchange=async e=>{
-const file=e.target.files[0];
-if(!file)return;
-pendingImage=await resize(file);
-};
-function resize(file){
-return new Promise((resolve,reject)=>{
-const img=new Image();
-const url=URL.createObjectURL(file);
-img.onload=()=>{
-const scale=Math.min(1,900/img.width,900/img.height);
-const c=document.createElement("canvas");
-c.width=Math.round(img.width*scale);
-c.height=Math.round(img.height*scale);
-c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-URL.revokeObjectURL(url);
-resolve(c.toDataURL("image/jpeg",0.65));
-};
-img.onerror=()=>reject(Error("Invalid image"));
-img.src=url;
-});
-}
-function persist(next){
-try{
-localStorage.setItem(KEY,JSON.stringify(next));
-records=next;
-return true;
-}catch(e){
-alert("Storage full. Export a backup or use smaller images.");
-return false;
-}
-}
-function save(){
-const issue=el("issue").value.trim();
-const solution=el("solution").value.trim();
-if(!issue||!solution){alert("Enter issue and solution.");return;}
-const item={id:editId||Date.now(),issue,solution,image:pendingImage};
-const next=editId?records.map(r=>r.id===editId?item:r):[item,...records];
-if(persist(next)){clearForm();render();}
-}
-function clearForm(){
-editId=null;pendingImage="";
-el("issue").value="";el("solution").value="";
-el("photo").value="";
-el("formTitle").textContent="Add Troubleshooting";
-}
-function edit(id){
-const r=records.find(x=>x.id===id);
-if(!r)return;
-editId=id;pendingImage=r.image||"";
-el("issue").value=r.issue;
-el("solution").value=r.solution;
-el("formTitle").textContent="Edit Troubleshooting";
-window.scrollTo(0,0);
-}
-function removeRecord(id){
-if(confirm("Delete this record?")){
-persist(records.filter(r=>r.id!==id));render();
-}
-}
-function render(){
-const q=el("search").value.toLowerCase();
-const root=el("records");root.replaceChildren();
-const matches=records.filter(r=>(r.issue+" "+r.solution).toLowerCase().includes(q));
-matches.forEach(r=>{
-const card=document.createElement("div");
-card.className="card";
-const title=document.createElement("h3");
-title.textContent=r.issue;card.append(title);
-const body=document.createElement("pre");
-body.textContent=r.solution;card.append(body);
-if(r.image){
-const img=document.createElement("img");
-img.src=r.image;img.alt="Troubleshooting image";
-card.append(img);
-}
-const editBtn=document.createElement("button");
-editBtn.className="small";editBtn.textContent="Edit";
-editBtn.onclick=()=>edit(r.id);
-const delBtn=document.createElement("button");
-delBtn.className="danger";delBtn.textContent="Delete";
-delBtn.onclick=()=>removeRecord(r.id);
-card.append(editBtn,delBtn);root.append(card);
-});
-if(!matches.length)root.textContent="No records found.";
-}
-function backup(){
-const blob=new Blob([JSON.stringify(records)],{type:"application/json"});
-const url=URL.createObjectURL(blob);
-const a=document.createElement("a");
-a.href=url;a.download="tech-savvy-backup.json";a.click();
-setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
-async function restore(event){
-const file=event.target.files[0];if(!file)return;
-try{
-const data=JSON.parse(await file.text());
-if(!Array.isArray(data)||!data.every(r=>typeof r.issue==="string"&&typeof r.solution==="string"&&typeof r.id==="number"&&(!r.image||typeof r.image==="string")))throw Error();
-if(confirm("Replace current records with this backup?")){
-if(persist(data)){clearForm();render();}
-}
-}catch(e){alert("Invalid backup file.");}
-event.target.value="";
-}
-render();
-</script>
-  
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js")
-      .catch(error => console.error("Offline setup failed:", error));
-  });
-}
-</script>
-
-</body>
-</html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#334e9a"><link rel="manifest" href="./manifest.json"><link rel="icon" href="./icon.svg"><title>Tech Savvy</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5fb;color:#243047;font:15px system-ui,Arial}header{background:#334e9a;color:white;text-align:center;padding:24px 12px}header h1{margin:0;font-size:28px}header p{margin:5px}header small{opacity:.9}main{max-width:720px;margin:auto;padding:14px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.tabs button{background:#e4e9f5;color:#27395e}.tabs button.active{background:#334e9a;color:white}.card{background:white;padding:15px;border-radius:14px;margin:12px 0;box-shadow:0 2px 9px #0001}button,input,select,textarea{font:inherit;border-radius:9px;padding:11px;border:1px solid #cbd3e2}input,select,textarea{width:100%;margin:5px 0 12px}textarea{min-height:130px}button{cursor:pointer;background:#334e9a;color:white;border:0}button:disabled{opacity:.5}.secondary{background:#e8edfa;color:#243047}.danger{background:#b83e50}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.hidden{display:none!important}.muted{color:#66738a;font-size:13px}.record-head{display:flex;justify-content:space-between;gap:8px;align-items:center;width:100%;text-align:left;background:white;color:#243047;padding:0}.record-head strong{display:block}.record-body{margin-top:14px;border-top:1px solid #e6e9f0;padding-top:12px;white-space:pre-wrap;overflow-wrap:anywhere}.photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}.photo{position:relative}.photo img{width:100%;height:110px;object-fit:cover;border-radius:9px;cursor:pointer;background:#edf0f7}.photo button{position:absolute;right:3px;top:3px;padding:3px 7px;background:#b83e50}.tag{display:inline-block;background:#e9eefb;padding:3px 8px;border-radius:20px;font-size:12px;margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1}label{font-weight:600;font-size:14px}h2{font-size:18px;margin:0 0 12px}#viewer{position:fixed;inset:0;background:#000e;z-index:5;display:none;align-items:center;justify-content:center;flex-direction:column;padding:15px}#viewer.show{display:flex}#viewer img{max-width:95vw;max-height:80vh;object-fit:contain}#viewer button{margin:12px}footer{text-align:center;color:#66738a;padding:15px;font-size:12px}
+</style></head><body><header><h1>💻 Tech Savvy</h1><p>My Troubleshooting Library</p><small>Developed by Marilyn Ursal</small></header><main><nav class="tabs"><button id="tab-library" class="active" onclick="showTab('library')">My Library</button><button id="tab-add" onclick="showTab('add')">Add Issue</button><button id="tab-backup" onclick="showTab('backup')">Backup</button></nav><section id="library" class="card"><div class="row"><h2>Saved Solutions</h2><span id="count" class="muted" style="text-align:right"></span></div><input id="search" placeholder="🔍 Search issue, solution or category" oninput="render()"><select id="filter" onchange="render()"></select><div id="records"></div></section><section id="add" class="card hidden"><h2 id="formTitle">Add Troubleshooting</h2><label>Issue / Problem</label><input id="issue" placeholder="e.g. Printer Not Responding"><label>Category</label><select id="category"></select><div class="row"><input id="newCategory" placeholder="New category (e.g. Printer)"><button class="secondary" onclick="addCategory()">+ Add Category</button></div><label>Solution / Steps</label><textarea id="solution" placeholder="What fixed the issue?"></textarea><label>Screenshots / Photos (multiple allowed)</label><input id="photoInput" type="file" accept="image/*" multiple onchange="addPendingPhotos(this.files)"><div id="pendingPhotos" class="photos"></div><div class="actions"><button onclick="saveRecord()">Save Issue</button><button class="secondary" onclick="clearForm()">Clear</button></div><p class="muted">Images are compressed. No fixed photo count, but device storage is limited.</p></section><section id="backup" class="card hidden"><h2>Backup & Restore</h2><button onclick="exportBackup()">Export All Records & Photos</button><p class="muted">Backups include records, custom categories, and images. Keep the downloaded JSON file safe.</p><label>Restore Backup</label><input type="file" accept=".json,application/json" onchange="importBackup(this)"><p class="muted">Restore replaces existing records. Export your current data first.</p><button class="secondary" onclick="exportBackup()">Download Backup Now</button></section><footer>Tech Savvy v1.1 • Personal offline library</footer></main><div id="viewer" onclick="this.classList.remove('show')"><button class="secondary">Close ×</button><img id="viewerImg" alt="Full screenshot"></div><script>
+const DB='tech-savvy-v11',STORE='photos',META='tech_savvy_v11_records',CATS='tech_savvy_v11_categories',OLD='tech_savvy_records_v1';let records=[],categories=[],editId=null,pending=[],db;const $=id=>document.getElementById(id);const uid=()=>crypto.randomUUID();const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+function photoOp(mode,key,value){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,mode==='get'?'readonly':'readwrite'),s=tx.objectStore(STORE),r=mode==='put'?s.put(value,key):mode==='delete'?s.delete(key):s.get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+function dataUrl(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{const ratio=Math.min(1,1400/img.width,1400/img.height),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*ratio));c.height=Math.max(1,Math.round(img.height*ratio));c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);resolve(c.toDataURL('image/jpeg',.75))};img.onerror=()=>{URL.revokeObjectURL(url);reject(Error('Invalid image'))};img.src=url})}
+function saveMeta(next){localStorage.setItem(META,JSON.stringify(next));records=next}
+function saveCats(){localStorage.setItem(CATS,JSON.stringify(categories));refreshCategories()}
+function refreshCategories(){for(const id of ['category','filter']){const el=$(id),prev=el.value;el.replaceChildren();const values=id==='filter'?['All Categories',...categories]:categories;for(const name of values){const o=document.createElement('option');o.value=name;o.textContent=name;el.append(o)}if(values.includes(prev))el.value=prev}}
+function addCategory(){const input=$('newCategory'),name=input.value.trim();if(!name)return;const existing=categories.find(c=>c.toLowerCase()===name.toLowerCase());if(!existing){categories.push(name);saveCats()}$('category').value=existing||name;input.value=''}
+function showTab(tab){for(const t of ['library','add','backup']){$(t).classList.toggle('hidden',t!==tab);$('tab-'+t).classList.toggle('active',t===tab)}window.scrollTo(0,0);if(tab==='library')render()}
+async function addPendingPhotos(files){for(const f of Array.from(files)){if(!f.type.startsWith('image/'))continue;try{pending.push({id:uid(),data:await dataUrl(f)})}catch(e){alert('Could not read '+f.name)}}$('photoInput').value='';renderPending()}
+function renderPending(){const root=$('pendingPhotos');root.replaceChildren();for(const p of pending){const wrap=document.createElement('div');wrap.className='photo';const img=document.createElement('img');img.src=p.data;img.onclick=()=>view(p.data);const btn=document.createElement('button');btn.textContent='×';btn.onclick=()=>{pending=pending.filter(x=>x.id!==p.id);renderPending()};wrap.append(img,btn);root.append(wrap)}}
+function clearForm(){editId=null;pending=[];$('issue').value='';$('solution').value='';$('photoInput').value='';$('formTitle').textContent='Add Troubleshooting';renderPending()}
+async function saveRecord(){const issue=$('issue').value.trim(),solution=$('solution').value.trim(),category=$('category').value;if(!issue||!solution)return alert('Enter issue and solution.');const old=records.find(r=>r.id===editId),item={id:editId||uid(),issue,solution,category,photoIds:[...(old?.photoIds||[]),...pending.map(p=>p.id)],created:old?.created||Date.now()};try{for(const p of pending)await photoOp('put',p.id,p.data);saveMeta(old?records.map(r=>r.id===editId?item:r):[item,...records]);clearForm();showTab('library')}catch(e){alert('Could not save. Device storage may be full. Export a backup and free storage.') }}
+function editRecord(id){const r=records.find(x=>x.id===id);if(!r)return;clearForm();editId=id;$('issue').value=r.issue;$('solution').value=r.solution;$('category').value=r.category;$('formTitle').textContent='Edit Troubleshooting';showTab('add')}
+async function deleteRecord(id){if(!confirm('Delete this issue and all its photos?'))return;const r=records.find(x=>x.id===id);if(!r)return;try{saveMeta(records.filter(x=>x.id!==id));for(const pid of r.photoIds||[])await photoOp('delete',pid);render()}catch(e){alert('Delete failed: '+e.message)}}
+async function deletePhoto(id,pid){if(!confirm('Remove this photo?'))return;const r=records.find(x=>x.id===id);if(!r)return;try{saveMeta(records.map(x=>x.id===id?{...x,photoIds:x.photoIds.filter(p=>p!==pid)}:x));await photoOp('delete',pid);render()}catch(e){alert('Could not remove photo')}}
+async function morePhotos(id,files){const r=records.find(x=>x.id===id);if(!r)return;const added=[];try{for(const file of Array.from(files)){if(!file.type.startsWith('image/'))continue;const pid=uid();await photoOp('put',pid,await dataUrl(file));added.push(pid)}saveMeta(records.map(x=>x.id===id?{...x,photoIds:[...x.photoIds,...added]}:x));render()}catch(e){alert('Could not add photos. Storage may be full.')} }
+function view(src){$('viewerImg').src=src;$('viewer').classList.add('show')}
+async function render(){const root=$('records');root.replaceChildren();$('count').textContent=records.length+' issues';const q=$('search').value.toLowerCase(),cat=$('filter').value;const matches=records.filter(r=>(cat==='All Categories'||r.category===cat)&&(r.issue+' '+r.solution+' '+r.category).toLowerCase().includes(q));if(!matches.length){root.textContent='No matching issues found.';return}for(const r of matches){const card=document.createElement('div');card.className='card';card.style.border='1px solid #edf0f5';const head=document.createElement('button');head.className='record-head';const left=document.createElement('span'),title=document.createElement('strong'),tag=document.createElement('span');title.textContent=r.issue;tag.className='tag';tag.textContent=(r.category||'Uncategorized')+' • '+(r.photoIds?.length||0)+' photos';left.append(title,tag);const arrow=document.createElement('span');arrow.textContent='⌄';head.append(left,arrow);const body=document.createElement('div');body.className='hidden';head.onclick=()=>{body.classList.toggle('hidden');arrow.textContent=body.classList.contains('hidden')?'⌄':'⌃'};const sol=document.createElement('div');sol.className='record-body';sol.textContent=r.solution;body.append(sol);const gallery=document.createElement('div');gallery.className='photos';body.append(gallery);for(const pid of r.photoIds||[]){const wrap=document.createElement('div');wrap.className='photo';const img=document.createElement('img');img.alt='Troubleshooting screenshot';photoOp('get',pid).then(data=>{if(data){img.src=data;img.onclick=()=>view(data)}});const del=document.createElement('button');del.textContent='×';del.onclick=()=>deletePhoto(r.id,pid);wrap.append(img,del);gallery.append(wrap)}const file=document.createElement('input');file.type='file';file.accept='image/*';file.multiple=true;file.className='hidden';file.onchange=async()=>{await morePhotos(r.id,file.files)};const actions=document.createElement('div');actions.className='actions';const add=document.createElement('button');add.textContent='+ Add More Photos';add.onclick=()=>file.click();const edit=document.createElement('button');edit.textContent='Edit Issue';edit.className='secondary';edit.onclick=()=>editRecord(r.id);const del=document.createElement('button');del.textContent='Delete';del.className='danger';del.onclick=()=>deleteRecord(r.id);actions.append(add,edit,del);body.append(file,actions);card.append(head,body);root.append(card)}}
+async function exportBackup(){try{const data=[];for(const r of records){const images=[];for(const pid of r.photoIds||[]){const img=await photoOp('get',pid);if(img)images.push(img)}data.push({...r,images})}const blob=new Blob([JSON.stringify({app:'Tech Savvy',version:2,categories,records:data})],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tech-savvy-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}catch(e){alert('Backup failed: '+e.message)}}
+async function importBackup(input){const file=input.files[0];if(!file)return;try{const raw=JSON.parse(await file.text()),items=Array.isArray(raw)?raw:raw.records;if(!Array.isArray(items)||!items.every(r=>typeof r.issue==='string'&&typeof r.solution==='string'&&(!r.images||Array.isArray(r.images))))throw Error('Invalid backup format');if(!confirm('Replace ALL current issues with this backup? Export your current records first.'))return;const next=[],newCats=Array.isArray(raw.categories)?raw.categories.filter(x=>typeof x==='string'):[];for(const r of items){const ids=[],images=r.images||[r.image].filter(Boolean);for(const img of images){if(typeof img!=='string'||!img.startsWith('data:image/'))continue;const pid=uid();await photoOp('put',pid,img);ids.push(pid)}const category=typeof r.category==='string'?r.category:'Uncategorized';if(!newCats.includes(category))newCats.push(category);next.push({id:uid(),issue:r.issue,solution:r.solution,category,photoIds:ids,created:r.created||Date.now()})}saveMeta(next);categories=newCats.length?newCats:['Uncategorized'];saveCats();render();alert('Backup restored successfully.')}catch(e){alert('Restore failed: '+e.message)}finally{input.value=''}}
+async function init(){try{db=await openDB();const saved=localStorage.getItem(META);categories=JSON.parse(localStorage.getItem(CATS)||'null')||['Laptop','Internet / Wi-Fi','Software','Mobile','Uncategorized'];if(saved){records=JSON.parse(saved)}else{const old=JSON.parse(localStorage.getItem(OLD)||'[]');const migrated=[];for(const r of old){const photoIds=[];if(typeof r.image==='string'&&r.image.startsWith('data:image/')){const id=uid();await photoOp('put',id,r.image);photoIds.push(id)}migrated.push({id:uid(),issue:r.issue||'',solution:r.solution||'',category:r.category||'Uncategorized',photoIds,created:Date.now()})}saveMeta(migrated)}for(const r of records){if(!categories.includes(r.category))categories.push(r.category||'Uncategorized')}saveCats();render()}catch(e){alert('Storage initialization failed: '+e.message)}}init();if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(console.error));
+</script></body></html>
