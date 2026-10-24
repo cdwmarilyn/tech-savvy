@@ -1,0 +1,19 @@
+
+{
+  "name": "Tech Savvy - My Troubleshooting Library",
+  "short_name": "Tech Savvy",
+  "description": "My personal searchable troubleshooting library",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6fb",
+  "theme_color": "#334e9a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
