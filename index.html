@@ -1,0 +1,160 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tech Savvy</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f6fb;margin:0;color:#243047}
+header{background:#334e9a;color:white;padding:22px;text-align:center}
+main{max-width:650px;margin:auto;padding:16px}
+input,textarea,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:9px;border:1px solid #ccc;font:inherit}
+textarea{min-height:110px}
+button{background:#334e9a;color:white;border:0;cursor:pointer}
+.card{background:white;padding:15px;margin:12px 0;border-radius:12px;box-shadow:0 2px 8px #0001}
+img{max-width:100%;max-height:250px;border-radius:8px}
+.small{background:#e9edf8;color:#243047}
+.danger{background:#b73545}
+.hidden{display:none}
+pre{white-space:pre-wrap;font-family:inherit}
+</style>
+</head>
+<body>
+<header>
+<h1>💻 Tech Savvy</h1>
+<p>My Troubleshooting Library</p>
+</header>
+<main>
+<input id="search" placeholder="🔍 Search issues or solutions..." oninput="render()">
+<div class="card">
+<h3 id="formTitle">Add Troubleshooting</h3>
+<input id="issue" placeholder="Issue / Problem">
+<textarea id="solution" placeholder="Solution / Steps"></textarea>
+<label>Attach image</label>
+<input id="photo" type="file" accept="image/*">
+<button onclick="save()">Save Record</button>
+<button class="small" onclick="clearForm()">Clear</button>
+</div>
+<div id="records"></div>
+<div class="card">
+<h3>Backup & Restore</h3>
+<button onclick="backup()">Export Backup</button>
+<input type="file" accept=".json,application/json" onchange="restore(event)">
+<p style="font-size:12px">Keep your backup file safe. Records stay in this browser unless exported.</p>
+</div>
+</main>
+<script>
+const KEY="tech_savvy_records_v1";
+let records=JSON.parse(localStorage.getItem(KEY)||"[]");
+let editId=null;
+let pendingImage="";
+const el=id=>document.getElementById(id);
+el("photo").onchange=async e=>{
+const file=e.target.files[0];
+if(!file)return;
+pendingImage=await resize(file);
+};
+function resize(file){
+return new Promise((resolve,reject)=>{
+const img=new Image();
+const url=URL.createObjectURL(file);
+img.onload=()=>{
+const scale=Math.min(1,900/img.width,900/img.height);
+const c=document.createElement("canvas");
+c.width=Math.round(img.width*scale);
+c.height=Math.round(img.height*scale);
+c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+URL.revokeObjectURL(url);
+resolve(c.toDataURL("image/jpeg",0.65));
+};
+img.onerror=()=>reject(Error("Invalid image"));
+img.src=url;
+});
+}
+function persist(next){
+try{
+localStorage.setItem(KEY,JSON.stringify(next));
+records=next;
+return true;
+}catch(e){
+alert("Storage full. Export a backup or use smaller images.");
+return false;
+}
+}
+function save(){
+const issue=el("issue").value.trim();
+const solution=el("solution").value.trim();
+if(!issue||!solution){alert("Enter issue and solution.");return;}
+const item={id:editId||Date.now(),issue,solution,image:pendingImage};
+const next=editId?records.map(r=>r.id===editId?item:r):[item,...records];
+if(persist(next)){clearForm();render();}
+}
+function clearForm(){
+editId=null;pendingImage="";
+el("issue").value="";el("solution").value="";
+el("photo").value="";
+el("formTitle").textContent="Add Troubleshooting";
+}
+function edit(id){
+const r=records.find(x=>x.id===id);
+if(!r)return;
+editId=id;pendingImage=r.image||"";
+el("issue").value=r.issue;
+el("solution").value=r.solution;
+el("formTitle").textContent="Edit Troubleshooting";
+window.scrollTo(0,0);
+}
+function removeRecord(id){
+if(confirm("Delete this record?")){
+persist(records.filter(r=>r.id!==id));render();
+}
+}
+function render(){
+const q=el("search").value.toLowerCase();
+const root=el("records");root.replaceChildren();
+const matches=records.filter(r=>(r.issue+" "+r.solution).toLowerCase().includes(q));
+matches.forEach(r=>{
+const card=document.createElement("div");
+card.className="card";
+const title=document.createElement("h3");
+title.textContent=r.issue;card.append(title);
+const body=document.createElement("pre");
+body.textContent=r.solution;card.append(body);
+if(r.image){
+const img=document.createElement("img");
+img.src=r.image;img.alt="Troubleshooting image";
+card.append(img);
+}
+const editBtn=document.createElement("button");
+editBtn.className="small";editBtn.textContent="Edit";
+editBtn.onclick=()=>edit(r.id);
+const delBtn=document.createElement("button");
+delBtn.className="danger";delBtn.textContent="Delete";
+delBtn.onclick=()=>removeRecord(r.id);
+card.append(editBtn,delBtn);root.append(card);
+});
+if(!matches.length)root.textContent="No records found.";
+}
+function backup(){
+const blob=new Blob([JSON.stringify(records)],{type:"application/json"});
+const url=URL.createObjectURL(blob);
+const a=document.createElement("a");
+a.href=url;a.download="tech-savvy-backup.json";a.click();
+setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function restore(event){
+const file=event.target.files[0];if(!file)return;
+try{
+const data=JSON.parse(await file.text());
+if(!Array.isArray(data)||!data.every(r=>typeof r.issue==="string"&&typeof r.solution==="string"&&typeof r.id==="number"&&(!r.image||typeof r.image==="string")))throw Error();
+if(confirm("Replace current records with this backup?")){
+if(persist(data)){clearForm();render();}
+}
+}catch(e){alert("Invalid backup file.");}
+event.target.value="";
+}
+render();
+</script>
+</body>
+</html>
