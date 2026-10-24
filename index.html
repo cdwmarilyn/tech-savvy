@@ -1,10 +1,10 @@
 
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#334e9a">
-<link rel="icon" href="./icon.svg">
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#334e9a">
+<link rel="icon" href="./icon.svg">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tech Savvy</title>
@@ -159,5 +159,15 @@ event.target.value="";
 }
 render();
 </script>
+  
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js")
+      .catch(error => console.error("Offline setup failed:", error));
+  });
+}
+</script>
+
 </body>
 </html>
